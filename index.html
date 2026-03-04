@@ -819,7 +819,7 @@
         </div>
         <div style="flex:1;text-align:center;background:var(--bg1);border-radius:8px;padding:6px 4px;">
           <div style="font-size:11px;color:var(--text3);margin-bottom:2px;">7칸 달성</div>
-          <div style="font-weight:700;color:var(--text1);">미니 CAST REC + 포토북 + 50%</div>
+          <div style="font-weight:700;color:var(--text1);">미니 OST + 50% 할인권</div>
         </div>
       </div>
     </div>
@@ -985,6 +985,9 @@ function migrateStampBoards(boards) {
         { at: 5, reward: '📸 폴라로이드 1매', couponKey: null, notified: b.currentCount >= 5 },
         { at: 7, reward: '미니 OST\n+ 50% 할인권', couponKey: 'discount50', notified: b.currentCount >= 7 }
       ];
+    } else {
+      const at3 = b.milestones.find(m => m.at === 3);
+      if (at3 && at3.qty === undefined) at3.qty = 2;
     }
     if (!b.totalSlots) b.totalSlots = 7;
     if (!b.reward)     b.reward     = '미니 OST\n+ 50% 할인권';
@@ -2273,7 +2276,7 @@ function renderStampBoards() {
     let statusHtml = '';
     if (paused)               statusHtml = `<div class="stamp-status-row stamp-status-paused">일시정지 중</div>`;
     else if (alldone)         statusHtml = `<div class="stamp-status-row stamp-status-done">🏆 완성! 미니 OST + 50% 할인권</div>`;
-    else if (mid5done)        statusHtml = `<div class="stamp-status-row stamp-status-mid">📸 폴라로이드 달성! (다음: 7칸 - 미니 CAST REC...)</div>`;
+    else if (mid5done)        statusHtml = `<div class="stamp-status-row stamp-status-mid">📸 폴라로이드 달성! (다음: 7칸 - 미니 OST + 50%)</div>`;
     else if (mid3done)        statusHtml = `<div class="stamp-status-row stamp-status-mid">🎉 3칸 달성! 40% 할인권 2장 (다음: 5칸 📸 폴라로이드)</div>`;
     else if (toNext !== null) statusHtml = `<div class="stamp-status-row stamp-status-next">다음: 3칸 (현재: ${cur}칸)</div>`;
 
