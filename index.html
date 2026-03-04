@@ -15,7 +15,7 @@
     --border: #e0e0dc; --text: #1a1a1a; --text1: #1a1a1a; --text2: #555550; --text3: #999990;
     --accent: #B8182A; --accent2: #8A1020; --accent-light: #F8E8EA;
     --danger: #cc4444; --success: #2a8a4a; --star: #f0a020;
-    --seat1: #F8E8EA; --seat2: #EDAAB5; --seat3: #D96070; --seat4: #C93040; --seat5: #8A1020;
+    --seat1: #EFC0C8; --seat2: #EDAAB5; --seat3: #D96070; --seat4: #C93040; --seat5: #8A1020;
     --shadow: 0 2px 12px rgba(0,0,0,0.08); --radius: 12px; --tab-h: 64px;
   }
   [data-theme="dark"] {
@@ -183,7 +183,7 @@
   .zone-label { font-size: 11px; font-weight: 700; color: var(--text3); }
   .seat-grid { display: flex; flex-direction: column; gap: 2px; }
   .seat-row { display: flex; gap: 2px; align-items: center; }
-  .row-label { font-size: 9px; color: var(--text3); width: 20px; text-align: right; margin-right: 2px; white-space: nowrap; overflow: visible; }
+  .row-label { font-size: 9px; color: var(--text3); min-width: 28px; width: 28px; flex-shrink: 0; text-align: right; margin-right: 2px; white-space: nowrap; }
   .seat-cell { width: 16px; height: 16px; border-radius: 3px; background: var(--bg3); border: 1px solid var(--border); transition: background 0.2s; flex-shrink: 0; }
   .seat-cell.v1 { background: var(--seat1); border-color: var(--seat1); }
   .seat-cell.v2 { background: var(--seat2); border-color: var(--seat2); }
@@ -269,7 +269,7 @@
   .hist-milestone-badge { display: inline-block; font-size: 10px; color: var(--accent); background: var(--accent-light); border-radius: 4px; padding: 1px 5px; margin-left: 4px; }
 
   .history-list { margin-top: 8px; }
-  .history-item { font-size: 12px; color: var(--text2); padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .history-item { font-size: 12px; color: var(--text2); padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .history-item:last-child { border-bottom: none; }
   .history-type { color: var(--text3); white-space: nowrap; }
   .history-comment { color: var(--text3); font-size: 11px; margin-top: 2px; }
@@ -768,9 +768,10 @@
   <div class="panel">
     <div class="panel-handle"></div>
     <div class="flex-between" style="margin-bottom:20px;">
-      <div class="panel-title">이력 직접 추가</div>
+      <div class="panel-title" id="direct-stamp-panel-title">이력 직접 추가</div>
       <button class="btn-icon" onclick="closePanel('overlay-direct-stamp')">✕</button>
     </div>
+    <input type="hidden" id="direct-stamp-edit-idx">
     <div class="form-group">
       <label class="form-label">날짜</label>
       <input type="date" class="form-control" id="direct-stamp-date">
@@ -779,7 +780,7 @@
       <label class="form-label">코멘트 (선택)</label>
       <input type="text" class="form-control" id="direct-stamp-comment" placeholder="예: 도장 나눔">
     </div>
-    <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="saveDirectStampHistory()">추가</button>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px;" id="direct-stamp-submit-btn" onclick="saveDirectStampHistory()">추가</button>
   </div>
 </div>
 
@@ -844,13 +845,9 @@
       <label class="form-label">도장 추가 방식</label>
       <div style="display:flex;flex-direction:column;gap:8px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="직접 관람" checked> 직접 관람</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="더블 적립권 사용"> 더블 적립권 사용</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;" id="stamp-method-exchange-label"><input type="radio" name="stamp-method" value="교환" onchange="onStampMethodChange()"> 교환</label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="나눔" onchange="onStampMethodChange()"> 나눔</label>
-      </div>
-      <div id="stamp-exchange-memo-group" style="display:none;margin-top:8px;">
-        <label class="form-label">교환 메모</label>
-        <input type="text" class="form-control" id="stamp-exchange-memo" placeholder="교환 상세 메모">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="교환"> 교환</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="나눔"> 나눔</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;"><input type="radio" name="stamp-method" value="기타"> 기타</label>
       </div>
     </div>
     <div class="form-group" style="margin-top:12px;">
@@ -965,6 +962,7 @@
 // DATA LAYER
 // ============================================================
 const APP_PREFIX = 'stone_';
+function localDate() { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 const DB = {
   get(key, def) { try { return JSON.parse(localStorage.getItem(APP_PREFIX+key)) ?? def; } catch { return def; } },
   set(key, val) { localStorage.setItem(APP_PREFIX+key, JSON.stringify(val)); }
@@ -1311,7 +1309,7 @@ function saveRecord() {
             newBoard.history.push({
               recordId: editId,
               date,
-              method: `${[skylar,didi,role3].filter(Boolean).join('×')} 관람 연동` + qtyLabel,
+              method: `${[skylar,didi,role3].filter(Boolean).join('·')} 관람 연동` + qtyLabel,
               comment: '',
               qty: actualQty
             });
@@ -1337,7 +1335,7 @@ function saveRecord() {
   } else {
     records.push(record);
     if (stampBoardId) {
-      const castStr = [skylar, didi, role3].filter(Boolean).join('×');
+      const castStr = [skylar, didi, role3].filter(Boolean).join('·');
       const toastMsg = applyStampToBoard(stampBoardId, stampQty, date, `${castStr} 관람 연동`);
       // 방금 추가된 history에 recordId 심기 (수정 시 정확한 삭제를 위해)
       const boards2 = getStampBoards();
@@ -1536,7 +1534,7 @@ function toggleCouponHistory() {
 
 function renderHome() {
   const records = getRecords();
-  const today   = new Date().toISOString().slice(0,10);
+  const today   = localDate();
   const dow     = ['일','월','화','수','목','금','토'];
 
   // 교신일지 접힘 상태 복원
@@ -1592,7 +1590,7 @@ function renderHome() {
       return `<div class="upcoming-item" onclick="openDetail('${r.id}')">
         <div class="upcoming-dday" style="${r.isBooked===false ? 'color:var(--text3);' : ''}">${dday2}</div>
         <div class="upcoming-date">${r.date.slice(5)} (${dow[d2.getDay()]}) ${r.time}</div>
-        <div class="upcoming-cast">${r.skylar}×${r.didi}${r.role3?'×'+r.role3:''}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
+        <div class="upcoming-cast">${r.skylar} · ${r.didi}${r.role3?' · '+r.role3:''}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
       </div>`;
     }).join('');
   } else {
@@ -1620,7 +1618,7 @@ function renderHome() {
 
   // ④ 쿠폰
   const coupons = getCoupons();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDate();
   // 잔여: 오늘까지 기준 / 최종: 미달성 milestone 포함 전체
   function homeCouponFinal(key) {
     const cur = calcCouponCount(key, coupons, boards, records);
@@ -1674,7 +1672,7 @@ function renderHome() {
     : past.map(r=>`
         <div class="record-mini" onclick="openDetail('${r.id}')">
           <div class="record-date-badge">${r.date.slice(5)}<br>${r.time}</div>
-          <div class="record-casting">${r.skylar} × ${r.didi}${r.role3?' × '+r.role3:''}</div>
+          <div class="record-casting">${r.skylar} · ${r.didi}${r.role3?' · '+r.role3:''}</div>
           <div class="record-rating">${r.rating?'★'.repeat(r.rating):''}</div>
         </div>`).join('');
 }
@@ -1727,7 +1725,7 @@ function updateCalFilterHint() {
   if (!el) return;
   const hasFilter = calFilterSky || calFilterDidi || calFilterRole3;
   el.textContent = hasFilter
-    ? `· ${[calFilterSky, calFilterDidi, calFilterRole3].filter(Boolean).join(' × ')} 회차 표시 중`
+    ? `· ${[calFilterSky, calFilterDidi, calFilterRole3].filter(Boolean).join(' · ')} 회차 표시 중`
     : '· 전체 회차 표시 중';
 }
 
@@ -1773,7 +1771,7 @@ function renderCalendar() {
 
   const firstDay   = new Date(calYear, calMonth, 1).getDay();
   const lastDate   = new Date(calYear, calMonth+1, 0).getDate();
-  const todayStr   = new Date().toISOString().slice(0,10);
+  const todayStr   = localDate();
   const totalCells = firstDay + lastDate;
   const weeks      = Math.ceil(totalCells / 7);
   const monthStr   = `${calYear}-${String(calMonth+1).padStart(2,'0')}`;
@@ -1917,7 +1915,7 @@ function renderCalDayPanel(ds, daySch, doneSet, bookedSet, records) {
         : `<button class="cal-session-add" onclick="openAddRecordFromSchedule('${ds}','${s.time}','${s.skylar}','${s.didi}','${s.role3||''}')">+ 기록</button>`;
       html += `<div class="cal-session-row">
         <div class="cal-session-time">${s.time}</div>
-        <div class="cal-session-casting"><span class="sky">${s.skylar}</span> × <span class="didi">${s.didi}</span>${s.role3?' × <span class="role3">'+s.role3+'</span>':''}</div>
+        <div class="cal-session-casting"><span class="sky">${s.skylar}</span> · <span class="didi">${s.didi}</span>${s.role3?' · <span class="role3">'+s.role3+'</span>':''}</div>
         ${badge}${btn}
       </div>`;
     });
@@ -1925,7 +1923,7 @@ function renderCalDayPanel(ds, daySch, doneSet, bookedSet, records) {
     dayRecords.sort((a,b)=>a.time.localeCompare(b.time)).forEach(r => {
       html += `<div class="cal-session-row">
         <div class="cal-session-time">${r.time}</div>
-        <div class="cal-session-casting"><span class="sky">${r.skylar}</span> × <span class="didi">${r.didi}</span>${r.role3?' × <span class="role3">'+r.role3+'</span>':''}</div>
+        <div class="cal-session-casting"><span class="sky">${r.skylar}</span> · <span class="didi">${r.didi}</span>${r.role3?' · <span class="role3">'+r.role3+'</span>':''}</div>
         <span class="cal-session-badge done">✅</span>
         <button class="cal-session-add" onclick="openDetail('${r.id}')">상세</button>
       </div>`;
@@ -2222,7 +2220,7 @@ function renderCoupon() { renderStampBoards(); renderCouponList(); }
 function calcStampCounts(b) {
   // 현재: 오늘 날짜까지 찍힌 도장 수
   // 최종: history 전체 합산 (미래 포함)
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDate();
   let curCount = 0, finalCount = 0;
   (b.history || []).forEach(h => {
     const qty = h.qty || 1;
@@ -2360,7 +2358,10 @@ function renderStampHistoryPanel() {
 function openAddStampHistoryDirectFromPanel() {
   if (!_stampHistoryPanelBoardId) return;
   _stampHistoryTargetId = _stampHistoryPanelBoardId;
-  document.getElementById('direct-stamp-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('direct-stamp-panel-title').textContent = '이력 직접 추가';
+  document.getElementById('direct-stamp-submit-btn').textContent = '추가';
+  document.getElementById('direct-stamp-edit-idx').value = '';
+  document.getElementById('direct-stamp-date').value = localDate();
   document.getElementById('direct-stamp-comment').value = '';
   openPanel('overlay-direct-stamp');
 }
@@ -2396,49 +2397,57 @@ function editStampHistoryItem(boardId, origIdx) {
   if (!board || !board.history) return;
   const h = board.history[origIdx];
   if (h.recordId) { showToast('관람 연동 항목은 수정할 수 없습니다'); return; }
-  const newDate = prompt('날짜 (YYYY-MM-DD)', h.date);
-  if (newDate === null) return;
-  const trimDate = newDate.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimDate)) { showToast('날짜 형식을 확인해주세요 (YYYY-MM-DD)'); return; }
-  const newComment = prompt('코멘트', h.comment || '');
-  if (newComment === null) return;
-  h.date = trimDate;
-  h.comment = newComment.trim();
-  recalcStampCount(board);
-  saveStampBoards(boards);
-  renderStampBoards();
-  renderCouponList();
-  renderHome();
-  renderStampHistoryPanel();
-  showToast('이력이 수정되었습니다');
+  _stampHistoryTargetId = boardId;
+  document.getElementById('direct-stamp-panel-title').textContent = '이력 수정';
+  document.getElementById('direct-stamp-submit-btn').textContent = '수정';
+  document.getElementById('direct-stamp-edit-idx').value = origIdx;
+  document.getElementById('direct-stamp-date').value = h.date;
+  document.getElementById('direct-stamp-comment').value = h.comment || '';
+  openPanel('overlay-direct-stamp');
 }
 
 // 교신일지 이력 직접 추가
 let _stampHistoryTargetId = null;
 function openAddStampHistoryDirect(boardId) {
   _stampHistoryTargetId = boardId;
-  document.getElementById('direct-stamp-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('direct-stamp-panel-title').textContent = '이력 직접 추가';
+  document.getElementById('direct-stamp-submit-btn').textContent = '추가';
+  document.getElementById('direct-stamp-edit-idx').value = '';
+  document.getElementById('direct-stamp-date').value = localDate();
   document.getElementById('direct-stamp-comment').value = '';
   openPanel('overlay-direct-stamp');
 }
 function saveDirectStampHistory() {
-  const boardId = _stampHistoryTargetId;
-  const date    = document.getElementById('direct-stamp-date').value;
-  const comment = document.getElementById('direct-stamp-comment').value.trim();
+  const boardId  = _stampHistoryTargetId;
+  const date     = document.getElementById('direct-stamp-date').value;
+  const comment  = document.getElementById('direct-stamp-comment').value.trim();
+  const editIdxStr = document.getElementById('direct-stamp-edit-idx').value;
+  const editIdx  = editIdxStr !== '' ? parseInt(editIdxStr) : null;
   if (!date) { showToast('날짜를 입력해주세요'); return; }
   const boards = getStampBoards();
   const board  = boards.find(b => b.id === boardId);
   if (!board) return;
-  if (!board.history) board.history = [];
-  board.history.push({ date, method: '직접 입력', comment, qty: 1 });
+  let toast;
+  if (editIdx !== null) {
+    // 수정 모드
+    if (!board.history || !board.history[editIdx]) return;
+    board.history[editIdx].date    = date;
+    board.history[editIdx].comment = comment;
+    toast = '이력이 수정되었습니다';
+  } else {
+    // 추가 모드
+    if (!board.history) board.history = [];
+    board.history.push({ date, method: '직접 입력', comment, qty: 1 });
+    toast = '이력이 추가되었습니다';
+    recalcStampCount(board);
+    (board.milestones||[]).forEach(m => {
+      if (board.currentCount >= m.at && !m.notified) {
+        m.notified = true;
+        toast = '◆ ' + m.reward + ' 달성!';
+      }
+    });
+  }
   recalcStampCount(board);
-  let toast = '이력이 추가되었습니다';
-  (board.milestones||[]).forEach(m => {
-    if (board.currentCount >= m.at && !m.notified) {
-      m.notified = true;
-      toast = '◆ ' + m.reward + ' 달성!';
-    }
-  });
   saveStampBoards(boards);
   closePanel('overlay-direct-stamp');
   renderStampBoards();
@@ -2546,21 +2555,15 @@ function togglePauseStampBoard(id) {
   showToast(board.paused ? '도장판이 일시정지되었습니다' : '도장판이 재개되었습니다');
 }
 
-function onStampMethodChange() {
-  const method = document.querySelector('input[name="stamp-method"]:checked')?.value;
-  const memoGroup = document.getElementById('stamp-exchange-memo-group');
-  if (memoGroup) memoGroup.style.display = (method === '교환' || method === '나눔') ? '' : 'none';
-}
+function onStampMethodChange() {}
 
 function openAddStamp(boardId) {
   document.getElementById('stamp-board-id').value = boardId;
   document.querySelector('input[name="stamp-method"][value="직접 관람"]').checked = true;
-  const memoGroup = document.getElementById('stamp-exchange-memo-group');
-  if (memoGroup) memoGroup.style.display = 'none';
   const qtyEl = document.querySelector('input[name="stamp-qty"][value="1"]');
   if (qtyEl) qtyEl.checked = true;
   const dateEl = document.getElementById('stamp-date');
-  if (dateEl) dateEl.value = new Date().toISOString().slice(0,10);
+  if (dateEl) dateEl.value = localDate();
   const commentEl = document.getElementById('stamp-comment');
   if (commentEl) commentEl.value = '';
   updateQtyLabel();
@@ -2647,15 +2650,11 @@ function applyStampToBoard(boardId, qty, date, historyComment) {
 
 function addStamp() {
   const boardId   = document.getElementById('stamp-board-id').value;
-  let method      = document.querySelector('input[name="stamp-method"]:checked').value;
-  if (method === '교환' || method === '나눔') {
-    const memoVal = document.getElementById('stamp-exchange-memo')?.value.trim();
-    if (memoVal) method = `${method}: ${memoVal}`;
-  }
+  const method    = document.querySelector('input[name="stamp-method"]:checked').value;
   const qtyEl     = document.querySelector('input[name="stamp-qty"]:checked');
   const qty       = qtyEl ? parseInt(qtyEl.value) || 1 : 1;
   const dateEl    = document.getElementById('stamp-date');
-  const date      = dateEl && dateEl.value ? dateEl.value : new Date().toISOString().slice(0,10);
+  const date      = dateEl && dateEl.value ? dateEl.value : localDate();
 
   const toastMsg = applyStampToBoard(boardId, qty, date, method);
   if (!toastMsg) return;
@@ -2720,7 +2719,7 @@ function openAddStampBoardFromRecord() {
 }
 
 function openAddCouponPack() {
-  document.getElementById('coupon-pack-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('coupon-pack-date').value = localDate();
   document.getElementById('coupon-pack-comment').value = '';
   openPanel('overlay-coupon-pack');
 }
@@ -2808,7 +2807,7 @@ function renderCouponList() {
   const coupons = getCoupons();
   const boards  = getStampBoards();
   const records = getRecords();
-  const today   = new Date().toISOString().slice(0, 10);
+  const today   = localDate();
 
   // 이력 접힘 상태 복원 (디폴트: 접힘)
   const histCollapsed = DB.get('couponHistoryCollapsed', true);
@@ -2898,7 +2897,7 @@ function renderCouponAllHistory() {
     if (!item) return;
     allRows.push({
       date: r.date, type: '사용', key, short: item.short,
-      comment: `${[r.skylar,r.didi,r.role3].filter(Boolean).join('×')} 관람`,
+      comment: `${[r.skylar,r.didi,r.role3].filter(Boolean).join('·')} 관람`,
       qty: 1, originalIdx: -1, rowType: 'record'
     });
   });
@@ -2964,7 +2963,7 @@ function openAddCouponManual() {
   document.getElementById('manual-coupon-key').value = 'discount40';
   document.querySelector('input[name="manual-coupon-type"][value="획득"]').checked = true;
   document.querySelector('input[name="manual-coupon-qty"][value="1"]').checked = true;
-  document.getElementById('manual-coupon-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('manual-coupon-date').value = localDate();
   document.getElementById('manual-coupon-comment').value = '';
   updateManualTypeLabel();
   updateManualQtyLabel();
@@ -3038,7 +3037,7 @@ function exportData() {
   };
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-  a.download = `stone_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `stone_backup_${localDate()}.json`;
   a.click();
   showToast('백업 파일이 다운로드되었습니다');
 }
