@@ -178,12 +178,17 @@
   .role-section-title { font-size: 12px; font-weight: 700; color: var(--text3); padding: 6px 8px 2px; }
 
   /* HEATMAP */
-  .heatmap-wrap { display: flex; gap: 8px; justify-content: center; overflow-x: auto; padding: 8px 0; }
-  .zone-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
-  .zone-label { font-size: 11px; font-weight: 700; color: var(--text3); }
-  .seat-grid { display: flex; flex-direction: column; gap: 2px; }
-  .seat-row { display: flex; gap: 2px; align-items: center; }
-  .row-label { font-size: 9px; color: var(--text3); min-width: 28px; width: 28px; flex-shrink: 0; text-align: right; margin-right: 2px; white-space: nowrap; }
+  .heatmap-wrap { display: flex; flex-direction: column; align-items: center; overflow-x: auto; padding: 8px 0; }
+  .hm-zone-header { display: flex; gap: 2px; align-items: center; margin-bottom: 4px; }
+  .hm-a-header { width: 196px; text-align: center; font-size: 11px; font-weight: 700; color: var(--text3); flex-shrink: 0; }
+  .hm-label-gap { width: 28px; flex-shrink: 0; }
+  .hm-b-header { width: 178px; text-align: center; font-size: 11px; font-weight: 700; color: var(--text3); flex-shrink: 0; }
+  .hm-rows { display: flex; flex-direction: column; gap: 2px; }
+  .hm-row { display: flex; align-items: center; gap: 2px; }
+  .hm-a-side { display: flex; gap: 2px; flex-shrink: 0; }
+  .hm-b-side { display: flex; gap: 2px; flex-shrink: 0; }
+  .hm-merged { display: flex; gap: 2px; flex-shrink: 0; }
+  .row-label { font-size: 9px; color: var(--text3); min-width: 28px; width: 28px; flex-shrink: 0; text-align: right; white-space: nowrap; }
   .seat-cell { width: 16px; height: 16px; border-radius: 3px; background: var(--bg3); border: 1px solid var(--border); transition: background 0.2s; flex-shrink: 0; }
   .seat-cell.v1 { background: var(--seat1); border-color: var(--seat1); }
   .seat-cell.v2 { background: var(--seat2); border-color: var(--seat2); }
@@ -769,7 +774,7 @@
     <div class="panel-handle"></div>
     <div class="flex-between" style="margin-bottom:20px;">
       <div class="panel-title" id="direct-stamp-panel-title">이력 직접 추가</div>
-      <button class="btn-icon" onclick="closePanel('overlay-direct-stamp')">✕</button>
+      <button class="btn-icon" onclick="cancelDirectStamp()">✕</button>
     </div>
     <input type="hidden" id="direct-stamp-edit-idx">
     <div class="form-group">
@@ -900,9 +905,6 @@
         </label>
         <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;" id="manual-type-label-사용">
           <input type="radio" name="manual-coupon-type" value="사용" onchange="updateManualTypeLabel()"> 사용
-        </label>
-        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;" id="manual-type-label-복원">
-          <input type="radio" name="manual-coupon-type" value="복원" onchange="updateManualTypeLabel()"> 복원
         </label>
       </div>
     </div>
@@ -1671,7 +1673,7 @@ function renderHome() {
     ? '<div style="text-align:center;color:var(--text3);padding:12px;font-size:13px;">기록이 없습니다</div>'
     : past.map(r=>`
         <div class="record-mini" onclick="openDetail('${r.id}')">
-          <div class="record-date-badge">${r.date.slice(5)}<br>${r.time}</div>
+          <div class="record-date-badge">${r.date.slice(5)} ${r.time}</div>
           <div class="record-casting">${r.skylar} · ${r.didi}${r.role3?' · '+r.role3:''}</div>
           <div class="record-rating">${r.rating?'★'.repeat(r.rating):''}</div>
         </div>`).join('');
@@ -2017,127 +2019,65 @@ function renderStats() {
   if (moneyBlurred) blurEl.classList.add('blurred'); else blurEl.classList.remove('blurred');
 }
 
-function buildSeatRows(zone, seatMap, highlight) {
-  // zone: 'A' or 'B', seatMap: { 'A-1-1': count }, highlight: {row, num} or null
-  // Returns html string for all seat rows
-  let html = '';
-  const cls = c => !c?'': c>=5?'v5':'v'+c;
-
-  if (zone === 'A') {
-    // 1~7열: 1~11번 (11석)
-    for (let row = 1; row <= 7; row++) {
-      html += `<div class="seat-row"><div class="row-label">${row}열</div>`;
-      for (let col = 1; col <= 11; col++) {
-        const k = `A-${row}-${col}`;
-        const cnt = seatMap[k]||0;
-        const c = cls(cnt);
-        const hl = highlight && highlight.zone==='A' && highlight.row===row && highlight.num===col;
-        html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="A ${row}열 ${col}번 ${cnt}회"></div>`;
-      }
-      html += `</div>`;
-    }
-    // 8열: 3~11번 (9석, 1~2번 없음)
-    html += `<div class="seat-row"><div class="row-label">8열</div>`;
-    html += `<div class="seat-cell" style="visibility:hidden;"></div><div class="seat-cell" style="visibility:hidden;"></div>`;
-    for (let col = 3; col <= 11; col++) {
-      const k = `A-8-${col}`;
-      const cnt = seatMap[k]||0;
-      const c = cls(cnt);
-      const hl = highlight && highlight.zone==='A' && highlight.row===8 && highlight.num===col;
-      html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="A 8열 ${col}번 ${cnt}회"></div>`;
-    }
-    html += `</div>`;
-    // gap between row 8 and 9
-    html += `<div style="height:8px;"></div>`;
-    // 9열: 3~10번 (8석, 1~2번 없음)
-    html += `<div class="seat-row"><div class="row-label">9열</div>`;
-    html += `<div class="seat-cell" style="visibility:hidden;"></div><div class="seat-cell" style="visibility:hidden;"></div>`;
-    for (let col = 3; col <= 10; col++) {
-      const k = `A-9-${col}`;
-      const cnt = seatMap[k]||0;
-      const c = cls(cnt);
-      const hl = highlight && highlight.zone==='A' && highlight.row===9 && highlight.num===col;
-      html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="A 9열 ${col}번 ${cnt}회"></div>`;
-    }
-    html += `</div>`;
-    // 10열: 3~11번 (9석, 1~2번 없음)
-    html += `<div class="seat-row"><div class="row-label">10열</div>`;
-    html += `<div class="seat-cell" style="visibility:hidden;"></div><div class="seat-cell" style="visibility:hidden;"></div>`;
-    for (let col = 3; col <= 11; col++) {
-      const k = `A-10-${col}`;
-      const cnt = seatMap[k]||0;
-      const c = cls(cnt);
-      const hl = highlight && highlight.zone==='A' && highlight.row===10 && highlight.num===col;
-      html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="A 10열 ${col}번 ${cnt}회"></div>`;
-    }
-    html += `</div>`;
-  } else if (zone === 'B') {
-    // 1~7열: 1~10번 (10석)
-    for (let row = 1; row <= 7; row++) {
-      html += `<div class="seat-row"><div class="row-label">${row}열</div>`;
-      for (let col = 1; col <= 10; col++) {
-        const k = `B-${row}-${col}`;
-        const cnt = seatMap[k]||0;
-        const c = cls(cnt);
-        const hl = highlight && highlight.zone==='B' && highlight.row===row && highlight.num===col;
-        html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="B ${row}열 ${col}번 ${cnt}회"></div>`;
-      }
-      html += `</div>`;
-    }
-    // 8열: 1~9번 (9석)
-    html += `<div class="seat-row"><div class="row-label">8열</div>`;
-    for (let col = 1; col <= 9; col++) {
-      const k = `B-8-${col}`;
-      const cnt = seatMap[k]||0;
-      const c = cls(cnt);
-      const hl = highlight && highlight.zone==='B' && highlight.row===8 && highlight.num===col;
-      html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="B 8열 ${col}번 ${cnt}회"></div>`;
-    }
-    html += `</div>`;
-    // gap between row 8 and 9
-    html += `<div style="height:8px;"></div>`;
-    // 9열: 1~10번 (10석)
-    html += `<div class="seat-row"><div class="row-label">9열</div>`;
-    for (let col = 1; col <= 10; col++) {
-      const k = `B-9-${col}`;
-      const cnt = seatMap[k]||0;
-      const c = cls(cnt);
-      const hl = highlight && highlight.zone==='B' && highlight.row===9 && highlight.num===col;
-      html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="B 9열 ${col}번 ${cnt}회"></div>`;
-    }
-    html += `</div>`;
-    // 10열: 1~7번 일반, 8~10번 판매보류
-    html += `<div class="seat-row"><div class="row-label">10열</div>`;
-    for (let col = 1; col <= 7; col++) {
-      const k = `B-10-${col}`;
-      const cnt = seatMap[k]||0;
-      const c = cls(cnt);
-      const hl = highlight && highlight.zone==='B' && highlight.row===10 && highlight.num===col;
-      html += `<div class="seat-cell${hl?' highlight':''}${c?' '+c:''}" title="B 10열 ${col}번 ${cnt}회"></div>`;
-    }
-    for (let col = 8; col <= 10; col++) {
-      html += `<div class="seat-cell reserved" title="B 10열 ${col}번 (판매보류)" style="background:var(--border);cursor:default;opacity:0.5;"></div>`;
-    }
-    html += `</div>`;
-  }
-  return html;
-}
-
 function renderHeatmap() {
   const records = getRecords();
   const seatMap = {};
   records.forEach(r => {
-    if (r.seatZone && r.seatRow!==null && r.seatRow!==undefined && r.seatNumber) {
+    if (r.seatZone && r.seatRow !== null && r.seatRow !== undefined && r.seatNumber) {
       const k = `${r.seatZone}-${r.seatRow}-${r.seatNumber}`;
-      seatMap[k] = (seatMap[k]||0) + 1;
+      seatMap[k] = (seatMap[k] || 0) + 1;
     }
   });
 
-  let html = '';
-  ['A','B'].forEach(z => {
-    html += `<div class="zone-wrap"><div class="zone-label">${z}블럭</div><div class="seat-grid">${buildSeatRows(z, seatMap, null)}</div></div>`;
-  });
-  document.getElementById('heatmap').innerHTML = html;
+  const cls = c => !c ? '' : c >= 5 ? 'v5' : 'v' + c;
+  const sc = (z, row, col) => {
+    const k = `${z}-${row}-${col}`, cnt = seatMap[k] || 0, c = cls(cnt);
+    return `<div class="seat-cell${c ? ' ' + c : ''}" title="${z} ${row}열 ${col}번 ${cnt}회"></div>`;
+  };
+  const hd = () => '<div class="seat-cell" style="visibility:hidden;"></div>';
+  const rv = (z, row, col) => `<div class="seat-cell" title="${z} ${row}열 ${col}번 (판매보류)" style="background:var(--border);opacity:0.5;"></div>`;
+
+  let h = '';
+  // 구역 레이블 헤더 (A블럭 좌 / B블럭 우)
+  h += '<div class="hm-zone-header"><div class="hm-a-header">A블럭</div><div class="hm-label-gap"></div><div class="hm-b-header">B블럭</div></div>';
+  h += '<div class="hm-rows">';
+
+  // 1~7열: A 11석 | 열라벨 | B 10석
+  for (let row = 1; row <= 7; row++) {
+    h += `<div class="hm-row"><div class="hm-a-side">`;
+    for (let col = 1; col <= 11; col++) h += sc('A', row, col);
+    h += `</div><div class="row-label">${row}열</div><div class="hm-b-side">`;
+    for (let col = 1; col <= 10; col++) h += sc('B', row, col);
+    h += '</div></div>';
+  }
+
+  // 8열: A(빈×2 + 3~11) | 열라벨 | B(1~9 + 빈)
+  h += `<div class="hm-row"><div class="hm-a-side">${hd()}${hd()}`;
+  for (let col = 3; col <= 11; col++) h += sc('A', 8, col);
+  h += `</div><div class="row-label">8열</div><div class="hm-b-side">`;
+  for (let col = 1; col <= 9; col++) h += sc('B', 8, col);
+  h += `${hd()}</div></div>`;
+
+  h += '<div style="height:8px;"></div>';
+
+  // 9열: A(빈×2 + 3~10 + 빈) | 열라벨 | B(1~10)
+  h += `<div class="hm-row"><div class="hm-a-side">${hd()}${hd()}`;
+  for (let col = 3; col <= 10; col++) h += sc('A', 9, col);
+  h += `${hd()}</div><div class="row-label">9열</div><div class="hm-b-side">`;
+  for (let col = 1; col <= 10; col++) h += sc('B', 9, col);
+  h += '</div></div>';
+
+  h += '<div style="height:8px;"></div>';
+
+  // 10열 (A+B 연결석, 통로 없음): 열라벨 | 빈×2 + A3~11 + B1~7 + 판매보류×3
+  h += `<div class="hm-row"><div class="row-label">10열</div><div class="hm-merged">${hd()}${hd()}`;
+  for (let col = 3; col <= 11; col++) h += sc('A', 10, col);
+  for (let col = 1; col <= 7; col++) h += sc('B', 10, col);
+  for (let col = 8; col <= 10; col++) h += rv('B', 10, col);
+  h += '</div></div>';
+
+  h += '</div>';
+  document.getElementById('heatmap').innerHTML = h;
 }
 
 // ============================================================
@@ -2282,7 +2222,7 @@ function renderStampBoards() {
       <div class="stamp-board-header">
         <div class="stamp-board-name">[🎟 ${b.name}]</div>
         <div class="stamp-board-menu">
-          <button class="stamp-menu-btn" onclick="renameStampBoard('${b.id}')" title="이름 변경">✏</button>
+          <button class="stamp-menu-btn" onclick="renameStampBoard('${b.id}')" title="이름 변경">📝</button>
           <button class="stamp-menu-btn" onclick="togglePauseStampBoard('${b.id}')" title="${paused ? '재개' : '일시정지'}">${paused ? '▶' : '⏸'}</button>
           <button class="stamp-menu-btn danger" onclick="deleteStampBoard('${b.id}')" title="삭제">✕</button>
         </div>
@@ -2349,7 +2289,7 @@ function renderStampHistoryPanel() {
         ${h.comment ? `<div class="history-comment">${h.comment}</div>` : ''}
       </div>
       <span class="history-type" style="font-size:11px;">${baseMethod}${qtyLabel}</span>
-      ${!h.recordId ? `<button class="btn-icon" style="font-size:12px;color:var(--text3);margin-left:2px;" onclick="editStampHistoryItem('${boardId}',${origIdx})">✏</button>` : ''}
+      ${!h.recordId ? `<button class="btn-icon" style="font-size:12px;color:var(--text3);margin-left:2px;" onclick="editStampHistoryItem('${boardId}',${origIdx})">📝</button>` : ''}
       <button class="btn-icon" style="font-size:12px;color:var(--danger);margin-left:2px;" onclick="deleteStampHistoryItemFromPanel('${boardId}',${origIdx})">✕</button>
     </div>`;
   }).join('') + '</div>';
@@ -2358,11 +2298,13 @@ function renderStampHistoryPanel() {
 function openAddStampHistoryDirectFromPanel() {
   if (!_stampHistoryPanelBoardId) return;
   _stampHistoryTargetId = _stampHistoryPanelBoardId;
+  _directStampFromHistory = true;
   document.getElementById('direct-stamp-panel-title').textContent = '이력 직접 추가';
   document.getElementById('direct-stamp-submit-btn').textContent = '추가';
   document.getElementById('direct-stamp-edit-idx').value = '';
   document.getElementById('direct-stamp-date').value = localDate();
   document.getElementById('direct-stamp-comment').value = '';
+  closePanel('overlay-stamp-history');
   openPanel('overlay-direct-stamp');
 }
 
@@ -2396,18 +2338,26 @@ function editStampHistoryItem(boardId, origIdx) {
   const board  = boards.find(b => b.id === boardId);
   if (!board || !board.history) return;
   const h = board.history[origIdx];
+  if (!h) return;
   if (h.recordId) { showToast('관람 연동 항목은 수정할 수 없습니다'); return; }
   _stampHistoryTargetId = boardId;
+  _directStampFromHistory = true;
   document.getElementById('direct-stamp-panel-title').textContent = '이력 수정';
   document.getElementById('direct-stamp-submit-btn').textContent = '수정';
   document.getElementById('direct-stamp-edit-idx').value = origIdx;
   document.getElementById('direct-stamp-date').value = h.date;
   document.getElementById('direct-stamp-comment').value = h.comment || '';
+  closePanel('overlay-stamp-history');
   openPanel('overlay-direct-stamp');
 }
 
 // 교신일지 이력 직접 추가
 let _stampHistoryTargetId = null;
+let _directStampFromHistory = false;
+function cancelDirectStamp() {
+  closePanel('overlay-direct-stamp');
+  if (_directStampFromHistory) openPanel('overlay-stamp-history');
+}
 function openAddStampHistoryDirect(boardId) {
   _stampHistoryTargetId = boardId;
   document.getElementById('direct-stamp-panel-title').textContent = '이력 직접 추가';
@@ -2448,8 +2398,10 @@ function saveDirectStampHistory() {
     });
   }
   recalcStampCount(board);
+  if (editIdx !== null) recalcStampCount(board);
   saveStampBoards(boards);
   closePanel('overlay-direct-stamp');
+  if (_directStampFromHistory) { _directStampFromHistory = false; openPanel('overlay-stamp-history'); }
   renderStampBoards();
   renderCouponList();
   renderHome();
