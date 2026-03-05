@@ -573,6 +573,13 @@
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
   </div>
   <div class="card">
+    <div class="card-title">📂 구 앱 데이터 불러오기</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">기존 앱 백업 JSON을 불러와 호환 변환합니다.<br>캐스팅·좌석·별점은 포함되지 않으며, 기존 기록은 교체됩니다.</p>
+    <button class="btn btn-outline" style="width:100%;" onclick="document.getElementById('import-v1-file').click()">백업 JSON 선택</button>
+    <input type="file" id="import-v1-file" accept=".json" style="display:none" onchange="importV1Data(event)">
+    <div id="import-v1-status" style="font-size:12px;margin-top:8px;"></div>
+  </div>
+  <div class="card">
     <div class="card-title">📱 홈스크린 추가 (PWA)</div>
     <p style="font-size:13px;color:var(--text2);">브라우저 메뉴 → "홈 화면에 추가"를 선택하면 앱처럼 설치할 수 있습니다.</p>
   </div>
@@ -3019,6 +3026,90 @@ function importData(e) {
   };
   reader.readAsText(file);
   e.target.value = '';
+}
+
+function importV1Data(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!confirm('기존 관람 기록, 도장판, 쿠폰 데이터가 모두 교체됩니다. 계속하시겠습니까?')) { e.target.value = ''; return; }
+  const statusEl = document.getElementById('import-v1-status');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const v1 = JSON.parse(ev.target.result);
+      if (!v1.boards || !v1.performances) throw new Error('올바른 형식이 아닙니다');
+
+      const discountMap = { '프리뷰':'preview','재관':'rewatch30','증빙프패':'discountPass','40%':'discount40','50%':'discount50' };
+      const timeMap = { '낮':'14:00','밤':'19:00' };
+
+      // boardId → stamp history
+      const boardHistMap = {};
+      v1.boards.forEach(b => { boardHistMap[b.id] = []; });
+
+      // performances → records
+      const newRecords = v1.performances.map(p => {
+        const stamped = Object.entries(p.boardStamps || {}).find(([,c]) => c > 0);
+        const stampBoardId = stamped ? stamped[0] : null;
+        const stampQty = stamped ? stamped[1] : null;
+        if (stampBoardId && stampQty > 0) {
+          (boardHistMap[stampBoardId] = boardHistMap[stampBoardId] || []).push({
+            recordId: p.id, date: p.date,
+            method: `${p.date} 관람 연동${stampQty > 1 ? ' ×'+stampQty : ''}`,
+            comment: '', qty: stampQty
+          });
+        }
+        return {
+          id: p.id, date: p.date, time: timeMap[p.timeSlot] || '',
+          skylar: '', didi: '', role3: '', isBooked: true,
+          seatZone: null, seatRow: null, seatNumber: null, price: null,
+          discountType: discountMap[p.discount] || null,
+          stampBoardId, stampQty,
+          rating: null, comment: '', memo: p.memo || '',
+          createdAt: p.date+'T00:00:00.000Z', updatedAt: p.date+'T00:00:00.000Z'
+        };
+      });
+
+      // boards → stamp boards
+      const newBoards = v1.boards.map(b => {
+        const hist = [...(boardHistMap[b.id] || [])];
+        if (b.initialStamps > 0) {
+          hist.unshift({ date: v1.performances[0]?.date || localDate(), method: '초기 스탬프', comment: '', qty: b.initialStamps });
+        }
+        const cnt = hist.reduce((s,h) => s+(h.qty||1), 0);
+        return {
+          id: b.id, name: b.name, totalSlots: 7,
+          reward: '미니 OST\n+ 50% 할인권',
+          milestones: [
+            { at:3, reward:'40% 할인권 2장', couponKey:'discount40', qty:2, notified: cnt>=3 },
+            { at:5, reward:'📸 폴라로이드 1매', couponKey:null, notified: cnt>=5 },
+            { at:7, reward:'미니 OST\n+ 50% 할인권', couponKey:'discount50', notified: cnt>=7 }
+          ],
+          currentCount: cnt, history: hist
+        };
+      });
+
+      // walletEntries → coupon history
+      const newCoupons = { discount40:{count:0,history:[]}, discount50:{count:0,history:[]}, discountPass:{count:0,history:[]} };
+      (v1.walletEntries || []).forEach(w => {
+        if (w.add40 > 0) newCoupons.discount40.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.add40 });
+        if (w.add50 > 0) newCoupons.discount50.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.add50 });
+        if (w.addCert > 0) newCoupons.discountPass.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.addCert });
+      });
+
+      saveRecords(newRecords);
+      saveStampBoards(newBoards);
+      saveCoupons(newCoupons);
+      e.target.value = '';
+      statusEl.textContent = `✅ 변환 완료: 관람 ${newRecords.length}건, 도장판 ${newBoards.length}개`;
+      statusEl.style.color = 'var(--success)';
+      renderHome(); renderCalendar(); renderCoupon(); renderStats();
+    } catch(err) {
+      statusEl.textContent = '❌ 오류: ' + err.message;
+      statusEl.style.color = 'var(--danger)';
+      e.target.value = '';
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ============================================================
