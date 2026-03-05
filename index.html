@@ -1616,8 +1616,8 @@ function renderHome() {
       (board.milestones || []).forEach(m => {
         if (before < m.at && after >= m.at) {
           // 이모지 추출: reward 문자열에서 이모지 찾기, 없으면 🎖
-          const match = m.reward.match(/\p{Emoji}/u);
-          milestoneEmoji[r.id] = match ? match[0] : '🎖';
+          const match = m.reward.match(/\p{Emoji_Presentation}/u);
+          if (match) milestoneEmoji[r.id] = match[0];
         }
       });
     });
