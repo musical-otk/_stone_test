@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>🍩 뮤지컬 스톤 관극 다이어리</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#7B2535">
+<meta name="theme-color" content="#B8182A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="스톤">
@@ -13,7 +13,7 @@
   :root {
     --bg: #f8f8f6; --bg1: #ffffff; --bg2: #ffffff; --bg3: #f0f0ee;
     --border: #e0e0dc; --text: #1a1a1a; --text1: #1a1a1a; --text2: #555550; --text3: #999990;
-    --accent: #7B2535; --accent2: #8A1020; --accent-light: #F8E8EA;
+    --accent: #B8182A; --accent2: #8A1020; --accent-light: #F8E8EA;
     --danger: #cc4444; --success: #2a8a4a; --star: #f0a020;
     --seat1: #EFC0C8; --seat2: #EDAAB5; --seat3: #D96070; --seat4: #C93040; --seat5: #8A1020;
     --shadow: 0 2px 12px rgba(0,0,0,0.08); --radius: 12px; --tab-h: 64px;
@@ -324,14 +324,12 @@
   .next-show-pill.sky, .next-show-pill.didi, .next-show-pill.role3 { }
   .next-show-seat { font-size: 12px; opacity: 0.7; }
 
-  .upcoming-item { display: flex; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--border); cursor: pointer; gap: 10px; }
+  .upcoming-item { display: flex; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); cursor: pointer; gap: 8px; }
   .upcoming-item:last-child { border-bottom: none; }
-  .upcoming-dday { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 36px; padding-top: 1px; }
-  .upcoming-main { flex: 1; min-width: 0; }
-  .upcoming-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
-  .upcoming-date { font-size: 12px; color: var(--text2); }
+  .upcoming-dday { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 36px; }
+  .upcoming-date { font-size: 12px; color: var(--text2); white-space: nowrap; }
   .upcoming-seat { font-size: 11px; color: var(--text3); opacity: 0.75; white-space: nowrap; }
-  .upcoming-cast { font-size: 11px; color: var(--text3); }
+  .upcoming-cast { font-size: 11px; color: var(--text3); white-space: nowrap; margin-left: auto; }
 
   .home-stamp-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .home-stamp-row:last-child { border-bottom: none; }
@@ -1595,13 +1593,9 @@ function renderHome() {
       const seat2 = r.seatZone ? `${r.seatZone}${r.seatRow}열 ${r.seatNumber}번` : '';
       return `<div class="upcoming-item" onclick="openDetail('${r.id}')">
         <div class="upcoming-dday" style="${r.isBooked===false ? 'color:var(--text3);' : ''}">${dday2}</div>
-        <div class="upcoming-main">
-          <div class="upcoming-row1">
-            <div class="upcoming-date">${r.date.slice(5)} (${dow[d2.getDay()]}) ${r.time}</div>
-            ${seat2 ? `<div class="upcoming-seat">${seat2}</div>` : ''}
-          </div>
-          <div class="upcoming-cast">${r.skylar} · ${r.didi}${r.role3?' · '+r.role3:''}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
-        </div>
+        <div class="upcoming-date">${r.date.slice(5)} (${dow[d2.getDay()]}) ${r.time}</div>
+        ${seat2 ? `<div class="upcoming-seat">${seat2}</div>` : ''}
+        <div class="upcoming-cast">${r.skylar} · ${r.didi}${r.role3?' · '+r.role3:''}${r.isBooked===false ? ' <span style="font-size:10px;color:var(--text3);">미정</span>' : ''}</div>
       </div>`;
     }).join('');
   } else {
