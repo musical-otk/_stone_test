@@ -575,8 +575,15 @@
   <div class="card">
     <div class="card-title">📂 구 앱 데이터 불러오기</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">기존 앱 백업 JSON을 불러와 호환 변환합니다.<br>캐스팅·좌석·별점은 포함되지 않으며, 기존 기록은 교체됩니다.</p>
-    <button class="btn btn-outline" style="width:100%;" onclick="document.getElementById('import-v1-file').click()">백업 JSON 선택</button>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('import-v1-file').click()">파일 선택</button>
+      <button class="btn btn-outline" style="flex:1;" onclick="toggleV1Paste()">JSON 붙여넣기</button>
+    </div>
     <input type="file" id="import-v1-file" accept=".json" style="display:none" onchange="importV1Data(event)">
+    <div id="import-v1-paste-area" style="display:none;">
+      <textarea id="import-v1-text" placeholder='{"boards":[...],"performances":[...],...}' style="width:100%;height:100px;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);resize:vertical;box-sizing:border-box;"></textarea>
+      <button class="btn btn-accent" style="width:100%;margin-top:6px;" onclick="importV1DataFromText()">가져오기</button>
+    </div>
     <div id="import-v1-status" style="font-size:12px;margin-top:8px;"></div>
   </div>
   <div class="card">
@@ -3028,6 +3035,89 @@ function importData(e) {
   e.target.value = '';
 }
 
+function toggleV1Paste() {
+  const area = document.getElementById('import-v1-paste-area');
+  area.style.display = area.style.display === 'none' ? '' : 'none';
+}
+
+function importV1DataFromText() {
+  const text = document.getElementById('import-v1-text').value.trim();
+  if (!text) return;
+  try {
+    const v1 = JSON.parse(text);
+    _processV1Import(v1);
+  } catch(err) {
+    const statusEl = document.getElementById('import-v1-status');
+    statusEl.textContent = '❌ JSON 파싱 오류: ' + err.message;
+    statusEl.style.color = 'var(--danger)';
+  }
+}
+
+function _processV1Import(v1) {
+  const statusEl = document.getElementById('import-v1-status');
+  if (!v1.boards || !v1.performances) throw new Error('올바른 형식이 아닙니다');
+
+  const discountMap = { '프리뷰':'preview','재관':'rewatch30','증빙프패':'discountPass','40%':'discount40','50%':'discount50' };
+  const timeMap = { '낮':'14:00','밤':'19:00' };
+
+  const boardHistMap = {};
+  v1.boards.forEach(b => { boardHistMap[b.id] = []; });
+
+  const newRecords = v1.performances.map(p => {
+    const stamped = Object.entries(p.boardStamps || {}).find(([,c]) => c > 0);
+    const stampBoardId = stamped ? stamped[0] : null;
+    const stampQty = stamped ? stamped[1] : null;
+    if (stampBoardId && stampQty > 0) {
+      (boardHistMap[stampBoardId] = boardHistMap[stampBoardId] || []).push({
+        recordId: p.id, date: p.date,
+        method: `${p.date} 관람 연동${stampQty > 1 ? ' ×'+stampQty : ''}`,
+        comment: '', qty: stampQty
+      });
+    }
+    return {
+      id: p.id, date: p.date, time: timeMap[p.timeSlot] || '',
+      skylar: '', didi: '', role3: '', isBooked: true,
+      seatZone: null, seatRow: null, seatNumber: null, price: null,
+      discountType: discountMap[p.discount] || null,
+      stampBoardId, stampQty,
+      rating: null, comment: '', memo: p.memo || '',
+      createdAt: p.date+'T00:00:00.000Z', updatedAt: p.date+'T00:00:00.000Z'
+    };
+  });
+
+  const newBoards = v1.boards.map(b => {
+    const hist = [...(boardHistMap[b.id] || [])];
+    if (b.initialStamps > 0) {
+      hist.unshift({ date: v1.performances[0]?.date || localDate(), method: '초기 스탬프', comment: '', qty: b.initialStamps });
+    }
+    const cnt = hist.reduce((s,h) => s+(h.qty||1), 0);
+    return {
+      id: b.id, name: b.name, totalSlots: 7,
+      reward: '미니 OST\n+ 50% 할인권',
+      milestones: [
+        { at:3, reward:'40% 할인권 2장', couponKey:'discount40', qty:2, notified: cnt>=3 },
+        { at:5, reward:'📸 폴라로이드 1매', couponKey:null, notified: cnt>=5 },
+        { at:7, reward:'미니 OST\n+ 50% 할인권', couponKey:'discount50', notified: cnt>=7 }
+      ],
+      currentCount: cnt, history: hist
+    };
+  });
+
+  const newCoupons = { discount40:{count:0,history:[]}, discount50:{count:0,history:[]}, discountPass:{count:0,history:[]} };
+  (v1.walletEntries || []).forEach(w => {
+    if (w.add40 > 0) newCoupons.discount40.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.add40 });
+    if (w.add50 > 0) newCoupons.discount50.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.add50 });
+    if (w.addCert > 0) newCoupons.discountPass.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.addCert });
+  });
+
+  saveRecords(newRecords);
+  saveStampBoards(newBoards);
+  saveCoupons(newCoupons);
+  statusEl.textContent = `✅ 변환 완료: 관람 ${newRecords.length}건, 도장판 ${newBoards.length}개`;
+  statusEl.style.color = 'var(--success)';
+  renderHome(); renderCalendar(); renderCoupon(); renderStats();
+}
+
 function importV1Data(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -3036,78 +3126,12 @@ function importV1Data(e) {
   const reader = new FileReader();
   reader.onload = ev => {
     try {
-      const v1 = JSON.parse(ev.target.result);
-      if (!v1.boards || !v1.performances) throw new Error('올바른 형식이 아닙니다');
-
-      const discountMap = { '프리뷰':'preview','재관':'rewatch30','증빙프패':'discountPass','40%':'discount40','50%':'discount50' };
-      const timeMap = { '낮':'14:00','밤':'19:00' };
-
-      // boardId → stamp history
-      const boardHistMap = {};
-      v1.boards.forEach(b => { boardHistMap[b.id] = []; });
-
-      // performances → records
-      const newRecords = v1.performances.map(p => {
-        const stamped = Object.entries(p.boardStamps || {}).find(([,c]) => c > 0);
-        const stampBoardId = stamped ? stamped[0] : null;
-        const stampQty = stamped ? stamped[1] : null;
-        if (stampBoardId && stampQty > 0) {
-          (boardHistMap[stampBoardId] = boardHistMap[stampBoardId] || []).push({
-            recordId: p.id, date: p.date,
-            method: `${p.date} 관람 연동${stampQty > 1 ? ' ×'+stampQty : ''}`,
-            comment: '', qty: stampQty
-          });
-        }
-        return {
-          id: p.id, date: p.date, time: timeMap[p.timeSlot] || '',
-          skylar: '', didi: '', role3: '', isBooked: true,
-          seatZone: null, seatRow: null, seatNumber: null, price: null,
-          discountType: discountMap[p.discount] || null,
-          stampBoardId, stampQty,
-          rating: null, comment: '', memo: p.memo || '',
-          createdAt: p.date+'T00:00:00.000Z', updatedAt: p.date+'T00:00:00.000Z'
-        };
-      });
-
-      // boards → stamp boards
-      const newBoards = v1.boards.map(b => {
-        const hist = [...(boardHistMap[b.id] || [])];
-        if (b.initialStamps > 0) {
-          hist.unshift({ date: v1.performances[0]?.date || localDate(), method: '초기 스탬프', comment: '', qty: b.initialStamps });
-        }
-        const cnt = hist.reduce((s,h) => s+(h.qty||1), 0);
-        return {
-          id: b.id, name: b.name, totalSlots: 7,
-          reward: '미니 OST\n+ 50% 할인권',
-          milestones: [
-            { at:3, reward:'40% 할인권 2장', couponKey:'discount40', qty:2, notified: cnt>=3 },
-            { at:5, reward:'📸 폴라로이드 1매', couponKey:null, notified: cnt>=5 },
-            { at:7, reward:'미니 OST\n+ 50% 할인권', couponKey:'discount50', notified: cnt>=7 }
-          ],
-          currentCount: cnt, history: hist
-        };
-      });
-
-      // walletEntries → coupon history
-      const newCoupons = { discount40:{count:0,history:[]}, discount50:{count:0,history:[]}, discountPass:{count:0,history:[]} };
-      (v1.walletEntries || []).forEach(w => {
-        if (w.add40 > 0) newCoupons.discount40.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.add40 });
-        if (w.add50 > 0) newCoupons.discount50.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.add50 });
-        if (w.addCert > 0) newCoupons.discountPass.history.push({ type:'획득', date:w.date, comment:w.note||'쿠폰팩 획득', qty:w.addCert });
-      });
-
-      saveRecords(newRecords);
-      saveStampBoards(newBoards);
-      saveCoupons(newCoupons);
-      e.target.value = '';
-      statusEl.textContent = `✅ 변환 완료: 관람 ${newRecords.length}건, 도장판 ${newBoards.length}개`;
-      statusEl.style.color = 'var(--success)';
-      renderHome(); renderCalendar(); renderCoupon(); renderStats();
+      _processV1Import(JSON.parse(ev.target.result));
     } catch(err) {
       statusEl.textContent = '❌ 오류: ' + err.message;
       statusEl.style.color = 'var(--danger)';
-      e.target.value = '';
     }
+    e.target.value = '';
   };
   reader.readAsText(file);
 }
