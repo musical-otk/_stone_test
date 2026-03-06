@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stone-test-v15';
+const CACHE_NAME = 'stone-test-v16';
 const BASE = '/_stone_test';
 
 // 앱 시작 시 캐시할 파일들
